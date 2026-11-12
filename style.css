@@ -1,0 +1,523 @@
+/* ---------- 1. Variabel warna ---------- */
+:root {
+  --bg:  #f4f7f5;   /* latar halaman */
+  --card: #ffffff;  /* latar kartu */
+  --tx:  #17302a;   /* teks utama */
+  --mu:  #5f7770;   /* teks redup */
+  --pr:  #0f766e;   /* warna utama */
+  --pr2: #ccfbf1;   /* warna utama (muda) */
+  --bd:  #dbe5e1;   /* garis tepi */
+  --dg:  #b91c1c;   /* bahaya / error */
+  --btn: #0f766e;   /* tombol */
+  --sb:  #0f766e;   /* sidebar */
+  --sbw: 250px;     /* lebar sidebar */
+}
+
+/* Mode gelap otomatis mengikuti pengaturan perangkat */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:  #0e1917;
+    --card: #162521;
+    --tx:  #e6f2ee;
+    --mu:  #93aca5;
+    --pr:  #2dd4bf;
+    --pr2: #134e4a;
+    --bd:  #274039;
+    --dg:  #f87171;
+    --btn: #0d9488;
+    --sb:  #0b3b36;
+  }
+}
+
+/* Mode gelap manual (data-theme="dark" pada <html>) */
+:root[data-theme="dark"] {
+  --bg:  #0e1917;
+  --card: #162521;
+  --tx:  #e6f2ee;
+  --mu:  #93aca5;
+  --pr:  #2dd4bf;
+  --pr2: #134e4a;
+  --bd:  #274039;
+  --dg:  #f87171;
+  --btn: #0d9488;
+  --sb:  #0b3b36;
+}
+
+
+/* ---------- 2. Reset & dasar ---------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--tx);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+}
+
+.mu {
+  color: var(--mu);
+  font-size: 0.9rem;
+}
+
+
+/* ---------- 3. Tombol & formulir ---------- */
+.btn {
+  background: var(--btn);
+  color: #ffffff;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn.o {                       /* tombol garis tepi */
+  background: transparent;
+  color: var(--pr);
+  border: 1.5px solid var(--pr);
+}
+
+.btn.d {                       /* tombol hapus / keluar */
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+.btn.s {                       /* tombol kecil */
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1.5px solid var(--bd);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--pr);
+  box-shadow: 0 0 0 3px var(--pr2);
+}
+
+label {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 0.85rem;
+  color: var(--mu);
+}
+
+
+/* ---------- 4. Halaman login ---------- */
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--sb);
+}
+
+.theme-fab {                   /* tombol tema di halaman login */
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.box {
+  width: 100%;
+  max-width: 400px;
+  padding: 28px;
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.box h1 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+}
+
+
+/* ---------- 5. Sidebar ---------- */
+.sb {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  width: var(--sbw);
+  display: flex;
+  flex-direction: column;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--sb);
+  color: #ffffff;
+  overflow-y: auto;
+  transition: transform 0.25s;
+}
+
+.brand {
+  margin-bottom: 14px;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.me {
+  margin-bottom: 14px;
+  padding: 10px;
+  font-size: 0.88rem;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+}
+
+.me .tag {
+  margin: 4px 0 0;
+  background: #ffffff;
+  color: var(--sb);
+}
+
+.menu-i {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 10px 12px;
+  text-align: left;
+  background: none;
+  color: #ffffff;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.menu-i:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.menu-i.on {
+  background: #ffffff;
+  color: var(--sb);
+  font-weight: 700;
+}
+
+.sb .theme-btn {              /* tombol mode gelap/terang di sidebar */
+  margin-top: auto;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sb .theme-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.sb .out {
+  margin-top: 8px;
+  padding: 9px;
+  background: none;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sb .out:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ov {                          /* lapisan gelap di belakang sidebar (HP) */
+  display: none;
+}
+
+
+/* ---------- 6. Konten utama ---------- */
+.content {
+  min-height: 100vh;
+  margin-left: var(--sbw);
+}
+
+.top {                         /* bar atas, hanya tampil di HP */
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  background: var(--sb);
+  color: #ffffff;
+}
+
+.top button {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 1.3rem;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+main {
+  max-width: 1000px;
+  margin: auto;
+  padding: 18px;
+}
+
+.sec {
+  margin-bottom: 22px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.bar {                         /* baris pencarian & filter */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bar > * {
+  flex: 1;
+  width: auto;
+  min-width: 130px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+
+/* ---------- 7. Kartu ---------- */
+.card {
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(20, 35, 58, 0.06);
+}
+
+.card h3 {
+  margin: 6px 0 4px;
+  font-size: 1rem;
+}
+
+.card p {
+  margin: 4px 0;
+  font-size: 0.9rem;
+  color: var(--mu);
+}
+
+/* Animasi hover: hanya kartu di Beranda, Kegiatan, dan Ekstrakurikuler */
+.card[class*=" k-"],
+.stat,
+.org {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+@media (hover: hover) {
+  .card[class*=" k-"]:hover,
+  .stat:hover,
+  .org:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 14px 28px rgba(0, 255, 17, 0.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card[class*=" k-"],
+  .stat,
+  .org {
+    transition: none;
+  }
+}
+
+/* Garis warna di kiri kartu menurut jenis kegiatan */
+.card[class*="k-"]       { border-left: 5px solid var(--pr); }
+.k-ekstrakurikuler       { border-left-color: #10b981 !important; }
+.k-acara                 { border-left-color: #3b82f6 !important; }
+.k-ujian                 { border-left-color: #ef4444 !important; }
+.k-libur                 { border-left-color: #f59e0b !important; }
+.k-pengumuman            { border-left-color: #8b5cf6 !important; }
+
+/* Kartu statistik di beranda */
+.stat {
+  text-align: center;
+  color: #ffffff;
+  border: 0;
+}
+
+.stat b {
+  display: block;
+  font-size: 1.8rem;
+  color: #ffffff;
+}
+
+.stat:nth-child(1) { background: #0f766e; }
+.stat:nth-child(2) { background: #15803d; }
+.stat:nth-child(3) { background: #0e7490; }
+.stat:nth-child(4) { background: #4d7c0f; }
+
+/* Kartu organisasi (6 warna bergantian) */
+.org {
+  border-top: 5px solid var(--c);
+}
+
+.org h3 {
+  font-size: 1.1rem;
+  color: var(--c);
+}
+
+.c0 { --c: #0f766e; }
+.c1 { --c: #15803d; }
+.c2 { --c: #0e7490; }
+.c3 { --c: #4d7c0f; }
+.c4 { --c: #b45309; }
+.c5 { --c: #0369a1; }
+
+/* Bingkai formulir saat mode ubah */
+.editing {
+  border: 2px solid var(--pr);
+  box-shadow: 0 0 0 4px var(--pr2);
+}
+
+
+/* ---------- 8. Label (tag) ---------- */
+.tag {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 2px 9px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--pr2);
+  color: var(--pr);
+  border-radius: 20px;
+}
+
+.tag.ekstrakurikuler { background: #d1fae5; color: #047857; }
+.tag.acara           { background: #dbeafe; color: #1d4ed8; }
+.tag.ujian           { background: #fee2e2; color: #b91c1c; }
+.tag.libur           { background: #fef3c7; color: #b45309; }
+.tag.pengumuman      { background: #ede9fe; color: #6d28d9; }
+
+
+/* ---------- 9. Tabel & utilitas ---------- */
+.tw {                          /* pembungkus tabel agar bisa digeser */
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--bd);
+}
+
+th {
+  background: var(--pr2);
+  color: var(--pr);
+}
+
+.empty {
+  padding: 30px;
+  text-align: center;
+  color: var(--mu);
+}
+
+
+/* ---------- 10. Responsif ---------- */
+
+/* Tablet & HP: sidebar jadi menu geser */
+@media (max-width: 800px) {
+  .sb {
+    transform: translateX(-100%);
+  }
+
+  body.open .sb {
+    transform: none;
+    box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
+  }
+
+  body.open .ov {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .content {
+    margin-left: 0;
+  }
+
+  .top {
+    display: flex;
+  }
+
+  main {
+    padding: 14px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* HP kecil: kartu satu kolom */
+@media (max-width: 520px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
