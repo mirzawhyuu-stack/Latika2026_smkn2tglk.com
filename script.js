@@ -1,3 +1,21 @@
+
+/* ---------- 0. Konfigurasi database (Firebase Firestore) ----------
+   Isi dengan data dari Firebase Console (Project settings > Your apps > Web app).
+   Selama masih bertuliskan "ISI_...", aplikasi memakai localStorage (data hanya
+   tersimpan di satu perangkat). Setelah diisi, data dipakai bersama semua perangkat. */
+const FIREBASE_CONFIG = {
+  apiKey:            "ISI_API_KEY",
+  authDomain:        "ISI_PROJECT_ID.firebaseapp.com",
+  projectId:         "ISI_PROJECT_ID",
+  storageBucket:     "ISI_PROJECT_ID.appspot.com",
+  messagingSenderId: "ISI_SENDER_ID",
+  appId:             "ISI_APP_ID"
+};
+
+// true jika Firebase SDK termuat dan konfigurasi sudah diisi
+const CLOUD = typeof firebase !== "undefined" && !String(FIREBASE_CONFIG.projectId).startsWith("ISI_");
+
+
 /* ---------- 1. Data awal ---------- */
 
 // Organisasi & ekstrakurikuler (n: nama, d: deskripsi, j: jadwal, p: pembina)
@@ -62,12 +80,12 @@ const sv = (key, value) => {
 
 /* ---------- 3. State aplikasi ---------- */
 
-let users = ld("sk_u", SEED_U);       // daftar pengguna
-let items = ld("sk_i", SEED_I);       // daftar informasi
+let users = CLOUD ? [] : ld("sk_u", SEED_U);   // daftar pengguna
+let items = CLOUD ? [] : ld("sk_i", SEED_I);   // daftar informasi
 let me    = ld("sk_me", null);        // pengguna yang sedang login
 let view  = "home";                   // halaman aktif
 let edit  = null;                     // id informasi yang sedang diubah
-let f     = { q: "", t: "", o: "" };  // filter: pencarian, jenis, organisasi
+let f     = { q: "", t: "", m: "", o: "" };  // filter: pencarian, jenis, bulan, organisasi
 let theme = ld("sk_theme", null);     // tema: "light", "dark", atau null (ikut perangkat)
 
 
@@ -93,6 +111,106 @@ function toggleTheme() {
   sv("sk_theme", theme);
   applyTheme();
   document.querySelectorAll(".theme-btn").forEach(b => b.textContent = themeLabel());
+}
+
+
+/* ---------- Database (Firestore atau localStorage) ---------- */
+
+let fsdb = null;   // koneksi Firestore (mode cloud)
+
+const DB = {
+  ready: false,    // data sudah siap dipakai?
+  error: "",       // pesan galat koneksi
+
+  // Simpan / perbarui pengguna
+  saveUser(u) {
+    users = users.some(x => x.u === u.u) ? users.map(x => x.u === u.u ? u : x) : [...users, u];
+    if (CLOUD) return fsdb.collection("users").doc(u.u).set(u).catch(dbFail);
+    sv("sk_u", users);
+  },
+
+  // Hapus pengguna
+  delUser(name) {
+    users = users.filter(x => x.u !== name);
+    if (CLOUD) return fsdb.collection("users").doc(name).delete().catch(dbFail);
+    sv("sk_u", users);
+  },
+
+  // Simpan / perbarui informasi
+  saveItem(i) {
+    items = items.some(x => x.id === i.id) ? items.map(x => x.id === i.id ? i : x) : [...items, i];
+    if (CLOUD) return fsdb.collection("items").doc(String(i.id)).set(i).catch(dbFail);
+    sv("sk_i", items);
+  },
+
+  // Hapus informasi
+  delItem(id) {
+    items = items.filter(x => x.id !== id);
+    if (CLOUD) return fsdb.collection("items").doc(String(id)).delete().catch(dbFail);
+    sv("sk_i", items);
+  }
+};
+
+function dbFail(err) {
+  console.error(err);
+  alert("Gagal menyimpan ke database: " + (err.message || err));
+}
+
+// Menghubungkan ke Firestore: data berubah otomatis di semua perangkat
+function startCloud() {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  fsdb = firebase.firestore();
+
+  let gotU = false, gotI = false, gotInit = false;
+
+  const check = () => {
+    if (!(gotU && gotI && gotInit)) return;
+    if (!DB.ready) { DB.ready = true; render(); }
+    else refresh();
+  };
+
+  const fail = e => {
+    console.error(e);
+    DB.error = e && e.code === "permission-denied"
+      ? "Akses database ditolak. Periksa aturan (Rules) Firestore."
+      : "Tidak dapat terhubung ke database. Periksa koneksi internet dan konfigurasi Firebase.";
+    render();
+  };
+
+  // Pantau perubahan secara langsung (real-time)
+  fsdb.collection("users").onSnapshot(s => { users = s.docs.map(d => d.data()); gotU = true; check(); }, fail);
+  fsdb.collection("items").onSnapshot(s => { items = s.docs.map(d => d.data()); gotI = true; check(); }, fail);
+
+  // Isi data awal sekali saja (pertama kali database masih kosong)
+  fsdb.doc("meta/init").get().then(d => {
+    if (d.exists) return;
+    const b = fsdb.batch();
+    SEED_U.forEach(u => b.set(fsdb.collection("users").doc(u.u), u));
+    SEED_I.forEach(i => b.set(fsdb.collection("items").doc(String(i.id)), i));
+    b.set(fsdb.doc("meta/init"), { at: Date.now() });
+    return b.commit();
+  }).then(() => { gotInit = true; check(); }).catch(fail);
+
+  // Jika terlalu lama tidak ada respons
+  setTimeout(() => {
+    if (!DB.ready && !DB.error) {
+      DB.error = "Koneksi lambat. Periksa internet Anda, lalu muat ulang halaman.";
+      render();
+    }
+  }, 12000);
+}
+
+// Memperbarui tampilan saat data berubah dari perangkat lain
+// (tidak menggambar ulang formulir, supaya ketikan tidak hilang)
+function refresh() {
+  if (!DB.ready) return;
+  if (me && !users.some(u => u.u === me.u)) { logout(); return; }
+  if (!me) return;
+
+  if (view === "home" || view === "eks") ({ home, eks })[view]();
+  else if (view === "keg") showList();
+  else if (view === "kel") kelTable();
+  else if (view === "usr") usrTable();
 }
 
 
@@ -133,6 +251,8 @@ const tsb = () => document.body.classList.toggle("open");
 
 function render() {
   document.body.classList.remove("open");
+  if (!DB.ready) return loadingView();
+  if (me && !users.some(u => u.u === me.u)) { me = null; sv("sk_me", null); }
   if (!me) return loginView();
 
   // Menu sidebar menurut peran
@@ -182,12 +302,24 @@ function go(v) {
 
 /* ---------- 6. Login & logout ---------- */
 
+// Layar tunggu saat data dari database belum siap
+function loadingView() {
+  $("#app").innerHTML = `
+    <div class="login">
+      <div class="box" style="text-align:center">
+        <h1>🏫 Info Kegiatan Sekolah</h1>
+        <p class="mu">${DB.error ? E(DB.error) : "Memuat data…"}</p>
+        ${DB.error ? '<button class="btn" onclick="location.reload()">Muat ulang</button>' : ""}
+      </div>
+    </div>`;
+}
+
 function loginView() {
   $("#app").innerHTML = `
     <div class="login">
       <button class="theme-btn theme-fab" onclick="toggleTheme()">${themeLabel()}</button>
       <div class="box">
-        <h1>🏫Login to School Information </h1>
+        <h1>🏫Login to school information </h1>
         <p class="mu">Masuk untuk melihat informasi sekolah.</p>
 
         <label>Username</label>
@@ -199,14 +331,8 @@ function loginView() {
 
         <p id="le" style="color:var(--dg);min-height:1.2em;font-size:.85rem"></p>
         <button class="btn" style="width:100%" onclick="login()">Masuk</button>
-
       </div>
     </div>`;
-}
-
-function fill(u, p) {
-  $("#lu").value = u;
-  $("#lp").value = p;
 }
 
 function login() {
@@ -279,37 +405,56 @@ function home() {
 
 /* ---------- 9. Halaman: Kegiatan ---------- */
 
+// Daftar bulan untuk filter (nilai "01" sampai "12")
+const MONTHS = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
+
+// "2026-12-07" -> "12"
+const monthOf = d => d.slice(5, 7);
+
 function keg() {
   const typeOptions = TYPES.map(t =>
     `<option ${f.t === t ? "selected" : ""}>${t}</option>`).join("");
 
-  const orgOptions = ORGS.map(o =>
-    `<option ${f.o === o.n ? "selected" : ""}>${o.n}</option>`).join("");
+  const monthOptions = MONTHS.map((name, x) => {
+    const v = String(x + 1).padStart(2, "0");
+    return `<option value="${v}" ${f.m === v ? "selected" : ""}>${name}</option>`;
+  }).join("");
+
+  // Penanda organisasi, muncul jika datang dari tombol "Lihat info" di Ekstrakurikuler
+  const orgChip = f.o ? `
+    <div class="row" style="margin-bottom:12px">
+      <span class="tag">Organisasi: ${E(f.o)}</span>
+      <button class="btn o s" onclick="f.o='';keg()">Hapus filter</button>
+    </div>` : "";
 
   $("#m").innerHTML = `
     <h2>Semua kegiatan</h2>
     <div class="bar">
-      <input placeholder="Cari…" value="${E(f.q)}" oninput="f.q=this.value;list()">
-      <select onchange="f.t=this.value;list()">
+      <input placeholder="Cari…" value="${E(f.q)}" oninput="f.q=this.value;showList()">
+      <select onchange="f.t=this.value;showList()">
         <option value="">Semua jenis</option>${typeOptions}
       </select>
-      <select onchange="f.o=this.value;list()">
-        <option value="">Semua organisasi</option>
-        <option ${f.o === "Umum" ? "selected" : ""}>Umum</option>${orgOptions}
+      <select onchange="f.m=this.value;showList()">
+        <option value="">Semua bulan</option>${monthOptions}
       </select>
     </div>
+    ${orgChip}
     <div class="grid" id="l"></div>`;
 
-  list();
+  showList();
 }
 
 // Menampilkan daftar sesuai filter
-function list() {
+function showList() {
   const q = f.q.toLowerCase();
   const result = sorted().filter(i =>
     (!f.t || i.t === f.t) &&
+    (!f.m || monthOf(i.dt) === f.m) &&
     (!f.o || i.o === f.o) &&
-    (i.ti + i.ds).toLowerCase().includes(q)
+    (i.ti + " " + i.ds + " " + i.o).toLowerCase().includes(q)
   );
 
   $("#l").innerHTML = result.map(itemCard).join("")
@@ -336,7 +481,7 @@ function eks() {
         <p>${E(o.d)}</p>
         <p>🕒 ${E(o.j)}<br>👤 Pembina: ${E(o.p)}<br>📌 ${count} informasi</p>
         <div class="row">
-          <button class="btn o s" onclick="f={q:'',t:'',o:'${o.n}'};go('keg')">Lihat info</button>
+          <button class="btn o s" onclick="f={q:'',t:'',m:'',o:'${o.n}'};go('keg')">Lihat info</button>
           ${joinBtn}
         </div>
       </div>`;
@@ -348,9 +493,8 @@ function eks() {
 // Siswa bergabung / keluar dari ekskul
 function toggleJ(name) {
   const u = users.find(x => x.u === me.u);
-  u.j = u.j || [];
-  u.j = u.j.includes(name) ? u.j.filter(x => x !== name) : [...u.j, name];
-  sv("sk_u", users);
+  const j = u.j || [];
+  DB.saveUser({ ...u, j: j.includes(name) ? j.filter(x => x !== name) : [...j, name] });
   eks();
 }
 
@@ -363,24 +507,11 @@ function kel() {
     t: "Pengumuman", o: "Umum", ti: "", dt: today(), ds: ""
   };
 
-  const rows = sorted().filter(canEdit);
-
   const typeOptions = TYPES.map(t =>
     `<option ${e.t === t ? "selected" : ""}>${t}</option>`).join("");
 
   const orgOptions = ORGS.map(o =>
     `<option ${e.o === o.n ? "selected" : ""}>${o.n}</option>`).join("");
-
-  const tableRows = rows.map(i => `
-    <tr>
-      <td>${E(i.ti)}<br><span class="mu">${E(i.o)}</span></td>
-      <td>${E(i.t)}</td>
-      <td>${fd(i.dt)}</td>
-      <td>
-        <button class="btn o s" onclick="editI(${i.id})">Ubah</button>
-        <button class="btn d s" onclick="delI(${i.id})">Hapus</button>
-      </td>
-    </tr>`).join("") || '<tr><td colspan="4" class="empty">Belum ada data.</td></tr>';
 
   $("#m").innerHTML = `
     <h2>${edit ? "Ubah" : "Tambah"} informasi</h2>
@@ -406,12 +537,29 @@ function kel() {
     </div>
 
     <h2>${me.r === "admin" ? "Semua informasi" : "Informasi buatan Anda"}</h2>
-    <div class="card tw">
-      <table>
-        <tr><th>Judul</th><th>Jenis</th><th>Tanggal</th><th></th></tr>
-        ${tableRows}
-      </table>
-    </div>`;
+    <div class="card tw" id="tb"></div>`;
+
+  kelTable();
+}
+
+// Tabel informasi (dipisah agar bisa diperbarui tanpa menghapus isian formulir)
+function kelTable() {
+  const tableRows = sorted().filter(canEdit).map(i => `
+    <tr>
+      <td>${E(i.ti)}<br><span class="mu">${E(i.o)}</span></td>
+      <td>${E(i.t)}</td>
+      <td>${fd(i.dt)}</td>
+      <td>
+        <button class="btn o s" onclick="editI(${i.id})">Ubah</button>
+        <button class="btn d s" onclick="delI(${i.id})">Hapus</button>
+      </td>
+    </tr>`).join("") || '<tr><td colspan="4" class="empty">Belum ada data.</td></tr>';
+
+  $("#tb").innerHTML = `
+    <table>
+      <tr><th>Judul</th><th>Jenis</th><th>Tanggal</th><th></th></tr>
+      ${tableRows}
+    </table>`;
 }
 
 // Masuk mode ubah, lalu gulir ke formulir
@@ -433,26 +581,25 @@ function saveI() {
     t:  $("#ft").value,
     o:  $("#fo").value,
     ti: ti,
-    dt: $("#fd").value,
+    dt: $("#fd").value || today(),
     ds: $("#fs").value.trim()
   };
 
   if (edit) {
-    items = items.map(i => i.id === edit ? { ...i, ...data } : i);
+    const old = items.find(i => i.id === edit);
+    DB.saveItem({ ...old, ...data });
   } else {
-    items.push({ id: Date.now(), ...data, a: me.u });
+    DB.saveItem({ id: Date.now(), ...data, a: me.u });
   }
 
-  sv("sk_i", items);
   edit = null;
   kel();
 }
 
 function delI(id) {
   if (confirm("Hapus informasi ini?")) {
-    items = items.filter(i => i.id !== id);
-    sv("sk_i", items);
-    kel();
+    DB.delItem(id);
+    kelTable();
   }
 }
 
@@ -460,14 +607,6 @@ function delI(id) {
 /* ---------- 12. Halaman: Pengguna (admin) ---------- */
 
 function usr() {
-  const tableRows = users.map(u => `
-    <tr>
-      <td>${E(u.n)}</td>
-      <td>${E(u.u)}</td>
-      <td><span class="tag">${u.r}</span></td>
-      <td>${u.u === me.u ? "" : `<button class="btn d s" onclick="delU('${E(u.u)}')">Hapus</button>`}</td>
-    </tr>`).join("");
-
   $("#m").innerHTML = `
     <h2>Tambah pengguna</h2>
     <div class="card sec">
@@ -489,12 +628,26 @@ function usr() {
     </div>
 
     <h2>Daftar pengguna</h2>
-    <div class="card tw">
-      <table>
-        <tr><th>Nama</th><th>Username</th><th>Peran</th><th></th></tr>
-        ${tableRows}
-      </table>
-    </div>`;
+    <div class="card tw" id="tb"></div>`;
+
+  usrTable();
+}
+
+// Tabel pengguna (dipisah agar bisa diperbarui tanpa menghapus isian formulir)
+function usrTable() {
+  const tableRows = users.map(u => `
+    <tr>
+      <td>${E(u.n)}</td>
+      <td>${E(u.u)}</td>
+      <td><span class="tag">${E(u.r)}</span></td>
+      <td>${u.u === me.u ? "" : `<button class="btn d s" onclick="delU('${E(u.u)}')">Hapus</button>`}</td>
+    </tr>`).join("");
+
+  $("#tb").innerHTML = `
+    <table>
+      <tr><th>Nama</th><th>Username</th><th>Peran</th><th></th></tr>
+      ${tableRows}
+    </table>`;
 }
 
 function addU() {
@@ -506,25 +659,34 @@ function addU() {
     alert("Semua kolom wajib diisi.");
     return;
   }
+  if (!/^[A-Za-z0-9_.-]{2,30}$/.test(u) || u.startsWith("__") || u === "." || u === "..") {
+    alert("Username hanya boleh huruf, angka, titik, strip, dan garis bawah (2-30 karakter).");
+    return;
+  }
   if (users.some(x => x.u === u)) {
     alert("Username sudah dipakai.");
     return;
   }
 
-  users.push({ u, p, n, r: $("#ur").value, j: [] });
-  sv("sk_u", users);
+  DB.saveUser({ u, p, n, r: $("#ur").value, j: [] });
   usr();
 }
 
 function delU(username) {
   if (confirm("Hapus pengguna ini?")) {
-    users = users.filter(x => x.u !== username);
-    sv("sk_u", users);
-    usr();
+    DB.delUser(username);
+    usrTable();
   }
 }
 
 
 /* ---------- Jalankan aplikasi ---------- */
 applyTheme();
-render();
+
+if (CLOUD) {
+  startCloud();      // tunggu data dari Firestore (layar "Memuat data...")
+  render();
+} else {
+  DB.ready = true;   // mode lokal: data langsung siap
+  render();
+}
