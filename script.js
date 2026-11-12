@@ -187,7 +187,7 @@ function loginView() {
     <div class="login">
       <button class="theme-btn theme-fab" onclick="toggleTheme()">${themeLabel()}</button>
       <div class="box">
-        <h1>🏫Login to school information </h1>
+        <h1>🏫Login to School Information </h1>
         <p class="mu">Masuk untuk melihat informasi sekolah.</p>
 
         <label>Username</label>
